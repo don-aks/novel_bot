@@ -1,54 +1,80 @@
 from time import sleep
 
-def input_int(text, error="Введите число!"):
-    while True:
-        inp = input(text)
-        try:
-            return int(inp)
-        except ValueError:
-            print(error)
+import config
 
 class Novel():
 
-    def __init__(self, name: str, storyline: list, exists_hentai: bool, 
-                id_author: int, show_author: bool, is_input_username: bool):
+    def __init__(self, name: str, storyline: list,
+                is_hentai: bool, is_input_username: bool):
+        """
+            :param name: Имя новеллы
+            :param storyline: Список слайдов для показа
+            :param is_hentai: Присутствует ли контент для взрослых
+            :param is_input_username: Давать ли возможность пользователю ...
+                ... ввести свое имя
+        """
         self.name = name
         self.storyline = storyline
-        self.exists_hentai = exists_hentai
-        self.id_author = id_author
-        self.show_author = show_author
+        self.is_hentai = is_hentai
         self.is_input_username = is_input_username
         self.username = None if is_input_username else False
 
         self.player_choices = {}
 
-    def play(self, sleep_time=0):
-        """Играть в однопоточном режиме."""
+    def play_in_console(self, sleep_time=0):
+        """
+            Играть в консоле.
+            :param sleep_time: (int) delay shows slides in seconds
+        """
         print(f'Вы начали играть в новеллу "{self.name}"')
-        if self.show_author:
-            print(f"@id{self.id_author} (Автор)")
         if self.is_input_username:
             self.username = input("Введите свое имя: ")
 
         move = self.move()
         while move:
-            move = self.move(move) # вписываем предыдущее значение
+            print(move[1]) # выводим текст
+            if move[2]: # Если есть выбор
+                # Функция для ввода выбора
+                while True:
+                    for i, option in enumerate(move[2]):
+                        print(f'{i+1}. {option}')
+
+                    inp = input("Введите номер выбора: ")
+                    try:
+                        choice = int(inp)
+                    except ValueError:
+                        print("Введенное значение должно быть числом!")
+                    else:
+                        if not len(move[2]) >= choice > 0:
+                            print(f"Введите цифру от 1 до {len(move[2])}!")
+                        else:
+                            break
+                choice -= 1
+
+                # Отсылаем move свой выбор
+                move = self.move(move[0], choice)
+                continue
+
+            move = self.move(move[0]) # вписываем предыдущий id слайда
             sleep(sleep_time)
 
         print("Новелла закончилась")
 
-    def move(self, slide_id=0):
+    def move(self, slide_id=0, choice_id=None):
         """
-            Показать один слайд начиная с slide_id.
-            Возвращает slide_id (int) после этого слайда или False, если слайдов
-            доступных для показа больше нет.
+            Вернуть информацию об одном слайде начиная со slide_id.
+            :param slide_id: (int)
+            :param choice_id: (int) id выбора на слайде slide_id
+            :return: (next slide_id, slide text, slide choice or None)
+                     or False if this slide is last
         """
-        while True: # пока условия (если есть) в слайде будут выполнены
+        while True: # пока условия в слайде будут выполнены (если они есть)
             try:
                 slide = self.storyline[slide_id]
             except IndexError:
                 return False
 
+            # Есть ли условие в слайде
             if 'if' in slide:
                 if self._is_condition(slide['if']):
                     slide = slide['slide']
@@ -58,27 +84,23 @@ class Novel():
             else:
                 break
 
-        print(slide['text'])
 
         if 'choice' in slide:
-            for i, option in enumerate(slide['choice']):
-                print(f'{i+1}. {option}')
-
-            # Input choice
-            while True:
-                choice = input_int("Введите цифру выбора: ")
-                if not len(slide['choice']) >= choice > 0:
-                    print(f"Введите цифру от 1 до {len(slide['choice'])}!")
-                    continue
-                break
-            choice -= 1
-
-            self.player_choices[slide_id] = choice
+            # если не указан id выбора, возвращать массив с выбором
+            if choice_id == None:
+                return slide_id, slide['text'], slide['choice']
+            # если указан, записываем
+            self.player_choices[slide_id] = choice_id
 
         slide_id += 1
-        return slide_id
+        return slide_id, slide['text'], None
 
     def _is_condition(self, conditions: dict):
+        """
+            Проверка условий conditions
+            :param conditions: dict conditions in slide
+            :return: bool
+        """
         for key, value in conditions.items():
             if key == "choice":
                 if not isinstance(value[1], list):
@@ -91,189 +113,5 @@ class Novel():
 
 
 if __name__ == '__main__':
-    storyline = [
-        {
-            "text": "Вы проснулись на корабле.",
-            "photo": "photo_id_in_vk",
-            "audio": "audio_id_in_vk"
-        },
-        {
-            "text": "Никого на горизонте не виднелось."
-        },
-        {
-            "text": "Вдруг вас бьет кто-то сзади. Обернувшись, вы обнаруживаете, что это самый настоящий"+
-            "зомби!!! Ваши действия?",
-            "choice": [
-                "Ударить зомби",
-                "Убежать",
-                "Помолиться Аллаху"
-            ]
-        },
-        {
-            "if": {
-                "choice": [2, 0]
-            },
-            "slide": {
-                "text": "После удара, голова зомби отлетела и упала на пол. Зомби повержен."
-            }
-        },
-        {
-            "if": {
-                "choice": [2, 0]
-            },
-            "slide": {
-                "text": "Вы пережили зомби апокалипсис!"
-            }
-        },
-        {
-            "if": {
-                "choice": [2, 1]
-            },
-            "slide": {
-                "text": "Вы убежали и уперелись в борт корабля. Зомби подходит все ближе"+
-                "и ближе. Ваши действия?",
-                "choice": [
-                    "Ударить зомби",
-                    "Прыгнуть в воду"
-                ]
-            }
-        },
-        {
-            "if": {
-                "choice": [5, 0]
-            }, 
-            "slide": {
-                "text": "Когда вы замахнулись на зомби, он понял с кем связался, и прыгнул"+
-                "в воду."
-            }
-        },
-        {
-            "if": {
-                "choice": [5, 0]
-            },
-            "slide": {
-                "text": "Вам позвонили. Имя неизвестно. Брать трубку?",
-                "choice": ["Да", "Нет"]
-            }
-        },        
-        {
-            "if": {
-                "choice": [7, 0]
-            }, 
-            "slide": {
-                "text": 'У вас спросили: "Вы человек?" Что ответить?',
-                "choice": ["Да", "Нет", "Чево???"]
-            },
-        },
-        {
-            "if": {
-                "choice": [8, 0]
-            }, 
-            "slide": {
-                "text": 'Вам ответили "Манда" и положили трубку.'
-            }
-        },
-        {
-            "if": {
-                "choice": [8, 1]
-            }, 
-            "slide": {
-                "text": 'Вам ответили "П*дора ответ" и положили трубку.'
-            }
-        },
-        {
-            "if": {
-                "choice": [8, 2]
-            },
-            "slide": {
-                "text": 'Вам ответили "Таво" и положили трубку.'
-            }
-        },
-        {
-            "if": {
-                "choice": [5, 0]
-            }, 
-            "slide": {
-                "text": "Вы решили проигнорировать странный звонок и искать решение проблемы."
-            }
-        },
-        {
-            "if": {
-                "choice": [5, 0]
-            },
-            "slide": {
-                "text": '"Что же делать... Что же делать..." - думаете вы. И я хз на самом деле.'
-            }
-        },
-        {
-            "if": {
-                "choice": [5, 0]
-            },
-            "slide": {
-                "text": 'Чо делать?',
-                "choice": ["ХЗ", "Чото", "Чо???"]
-            }
-        },
-        {
-            "if": {
-                "choice": [14, 0]
-            },
-            "slide": {
-                "text": "Я тоже хз. Так шо пока!"
-            }
-        },
-        {
-            "if": {
-                "choice": [14, 1]
-            },
-            "slide": {
-                "text": "Да, чото надо делать. Но не сегодня. Пока!"
-            }
-        },
-        {
-            "if": {
-                "choice": [14, 2]
-            },
-            "slide": {
-                "text": "Через плеЧО, епта! Пока!"
-            }
-        },
-        {
-            "if": {
-                "choice": [5, 1]
-            },
-            "slide": {
-                "text": "Вы прыгнули в воду и вас тотчас съела голодная акула"
-            }
-        },
-        {
-            "if": {
-                "choice": [5, 1]
-            },
-            "slide": {
-                "text": "Вы умерли"
-            }
-        },
-        {
-            "if": {
-                "choice": [2, 2]
-            },
-            "slide": {
-                "text": "Вы решили помолиться Аллаху, но это не помогло. Вас съел голодный зомби."
-            }
-        },
-        {
-            "if": {
-                "choice": [2, 2]
-            },
-            "slide": {
-                "text": "Вы умерли!"
-            }
-        },
-        {
-            "text": "Это все. НЕ ЗАБУДЬ АЦЕНИТЬ МАЮ НОВЕЛУ ЛАЙКОМ НЕ СУДИТИ СТРОГА!!!!))))) ПОКА!"
-        }
-    ]
-
-    novel = Novel("test", storyline, False, 0, True, False)
-    novel.play()
+    novel = Novel("test", config.example_storyline, False, False)
+    novel.play_in_console()
