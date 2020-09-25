@@ -3,6 +3,9 @@ from time import sleep
 import config
 
 class Novel():
+    """
+        Класс, содержащий новеллу с одним игроком
+    """
 
     def __init__(self, name: str, storyline: list,
                 is_hentai: bool, is_input_username: bool):
@@ -20,11 +23,49 @@ class Novel():
         self.username = None if is_input_username else False
 
         self.player_choices = {}
+        self.slide_id = 2
 
-    def play_in_console(self, sleep_time=0):
+
+    def move(self, choice_id: int = None) -> dict:
+        """
+            Вернуть информацию об одном слайде начиная с self.slide_id
+            :param choice_id: (int) id выбора на слайде self.slide_id
+            :return: slide (dict) or False if this slide is last
+        """
+        # пока условия в слайде будут выполнены (если они есть)
+        while True:
+            # Если слайда не существует
+            if self.slide_id >= len(self.storyline):
+                return False
+
+            slide = self.storyline[self.slide_id]
+            # Есть ли условие в слайде
+            if 'if' in slide:
+                if self._is_condition(slide['if']):
+                    break
+                else:
+                    self.slide_id += 1
+            else:
+                break
+
+        choice = None
+        # Если есть выбор и choice_id
+        if 'choice' in slide and choice_id != None:
+            self.player_choices[self.slide_id] = choice_id
+            self.slide_id += 1
+            # Возвращаем следующий слайд после выбора
+            # Нужно вызвать еще раз для проверки условий
+            return self.move()
+        else:
+            self.slide_id += 1
+
+        return slide
+
+
+    def play_in_console(self, sleep_time: int = 0):
         """
             Играть в консоле.
-            :param sleep_time: (int) delay shows slides in seconds
+            :param sleep_time: (int) delay show slides in seconds
         """
         print(f'Вы начали играть в новеллу "{self.name}"')
         if self.is_input_username:
@@ -32,8 +73,8 @@ class Novel():
 
         move = self.move()
         while move:
-            print(move[1]) # выводим текст
-            if move[2]: # Если есть выбор
+            print(move['text']) # выводим текст
+            if 'choice' in move: # Если есть выбор
                 # Функция для ввода выбора
                 while True:
                     for i, option in enumerate(move[2]):
@@ -52,50 +93,16 @@ class Novel():
                 choice -= 1
 
                 # Отсылаем move свой выбор
-                move = self.move(move[0], choice)
+                move = self.move(choice)
                 continue
 
-            move = self.move(move[0]) # вписываем предыдущий id слайда
+            move = self.move() # вписываем предыдущий id слайда
             sleep(sleep_time)
 
         print("Новелла закончилась")
 
-    def move(self, slide_id=0, choice_id=None):
-        """
-            Вернуть информацию об одном слайде начиная со slide_id.
-            :param slide_id: (int)
-            :param choice_id: (int) id выбора на слайде slide_id
-            :return: (next slide_id, slide text, slide choice or None)
-                     or False if this slide is last
-        """
-        while True: # пока условия в слайде будут выполнены (если они есть)
-            try:
-                slide = self.storyline[slide_id]
-            except IndexError:
-                return False
 
-            # Есть ли условие в слайде
-            if 'if' in slide:
-                if self._is_condition(slide['if']):
-                    slide = slide['slide']
-                    break
-                else:
-                    slide_id += 1
-            else:
-                break
-
-
-        if 'choice' in slide:
-            # если не указан id выбора, возвращать массив с выбором
-            if choice_id == None:
-                return slide_id, slide['text'], slide['choice']
-            # если указан, записываем
-            self.player_choices[slide_id] = choice_id
-
-        slide_id += 1
-        return slide_id, slide['text'], None
-
-    def _is_condition(self, conditions: dict):
+    def _is_condition(self, conditions: dict) -> bool:
         """
             Проверка условий conditions
             :param conditions: dict conditions in slide
