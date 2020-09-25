@@ -1,3 +1,5 @@
+token = "6362500a4521591a1768094debeb2168a115cc19c9c68a8b2aa5834c604ba7b212ad261b8890d5138eccd"
+
 example_storyline = [
     {
         "text": "Вы проснулись на корабле.",
