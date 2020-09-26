@@ -1,10 +1,12 @@
 from vkbottle import Bot, Message, Proxy
-from vkbottle.keyboard import Keyboard, Text, keyboard_gen
+from vkbottle.keyboard import Keyboard, keyboard_gen
 
 from main import Novel
 import config
 
+
 class BotOutput:
+
     """
         Методы класса возвращают
         строку или клавиатуру 
@@ -14,12 +16,8 @@ class BotOutput:
     def move(self, move: tuple):
         pass
 
-    def generate_keyboard(self, array: list, color="secondary") -> Keyboard:
-        lenght = len(array)
-        btn = {
-
-        }
-        if lenght <= 5:
+    def generate_keyboard(self, array: list, color="secondary") -> Keyboard or False:
+        if len(array) <= 5:
             # [1, 2, 3, 4, 5] => [[1], [2], [3], [4], [5]]
             return keyboard_gen([[
                 {
@@ -31,7 +29,7 @@ class BotOutput:
                     }
                 }
             ] for i, text in enumerate(array)])
-        elif lenght <= 10:
+        elif len(array) <= 10:
             # [1, 2, 3, 4, 5, 6] => [[1, 2], [3, 4], [5, 6]]
             return keyboard_gen([[
                 {
@@ -62,6 +60,7 @@ bot_output = BotOutput()
 
 players = {}
 
+
 @bot.on.message()
 async def on_message(message: Message):
     """
@@ -87,7 +86,6 @@ async def on_message(message: Message):
             return "Введенное значение должно быть числом!"
         else:
             len_choice = len(novel.storyline[novel.slide_id]['choice'])
-            move = novel.move()
             if not len_choice >= choice > 0:
                 return f"Введите цифру от 1 до {len_choice}!"
 

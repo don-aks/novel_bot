@@ -2,13 +2,14 @@ from time import sleep
 
 import config
 
-class Novel():
+
+class Novel:
     """
         Класс, содержащий новеллу с одним игроком
     """
 
     def __init__(self, name: str, storyline: list,
-                is_hentai: bool, is_input_username: bool):
+                 is_hentai: bool, is_input_username: bool):
         """
             :param name: Имя новеллы
             :param storyline: Список слайдов для показа
@@ -25,8 +26,7 @@ class Novel():
         self.player_choices = {}
         self.slide_id = 2
 
-
-    def move(self, choice_id: int = None) -> dict:
+    def move(self, choice_id: int = None) -> dict or False:
         """
             Вернуть информацию об одном слайде начиная с self.slide_id
             :param choice_id: (int) id выбора на слайде self.slide_id
@@ -48,9 +48,8 @@ class Novel():
             else:
                 break
 
-        choice = None
         # Если есть выбор и choice_id
-        if 'choice' in slide and choice_id != None:
+        if 'choice' in slide and choice_id is not None:
             self.player_choices[self.slide_id] = choice_id
             self.slide_id += 1
             # Возвращаем следующий слайд после выбора
@@ -60,7 +59,6 @@ class Novel():
             self.slide_id += 1
 
         return slide
-
 
     def play_in_console(self, sleep_time: int = 0):
         """
@@ -73,12 +71,12 @@ class Novel():
 
         move = self.move()
         while move:
-            print(move['text']) # выводим текст
-            if 'choice' in move: # Если есть выбор
+            print(move['text'])  # выводим текст
+            if 'choice' in move:  # Если есть выбор
                 # Функция для ввода выбора
                 while True:
                     for i, option in enumerate(move[2]):
-                        print(f'{i+1}. {option}')
+                        print(f'{i + 1}. {option}')
 
                     inp = input("Введите номер выбора: ")
                     try:
@@ -96,11 +94,10 @@ class Novel():
                 move = self.move(choice)
                 continue
 
-            move = self.move() # вписываем предыдущий id слайда
+            move = self.move()  # вписываем предыдущий id слайда
             sleep(sleep_time)
 
         print("Новелла закончилась")
-
 
     def _is_condition(self, conditions: dict) -> bool:
         """
