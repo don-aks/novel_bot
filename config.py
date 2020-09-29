@@ -1,4 +1,6 @@
-token = "6362500a4521591a1768094debeb2168a115cc19c9c68a8b2aa5834c604ba7b212ad261b8890d5138eccd"
+from dotenv import dotenv_values
+
+token = dotenv_values()['TOKEN']
 
 example_storyline = [
     {
@@ -47,7 +49,7 @@ example_storyline = [
     {
         "if": {
             "choice": [5, 0]
-        }, 
+        },
         "text": "Когда вы замахнулись на зомби, он понял с кем связался, и прыгнул"
                 + "в воду."
     },
@@ -57,7 +59,7 @@ example_storyline = [
         },
         "text": "Вам позвонили. Имя неизвестно. Брать трубку?",
         "choice": ["Да", "Нет"]
-    },        
+    },
     {
         "if": {
             "choice": [7, 0]

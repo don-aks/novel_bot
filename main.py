@@ -5,7 +5,8 @@ import config
 
 class Novel:
     """
-        Класс, содержащий новеллу с одним игроком
+        Класс, содержащий новеллу
+        с одним игроком
     """
 
     def __init__(self, name: str, storyline: list,
@@ -13,9 +14,11 @@ class Novel:
         """
             :param name: Имя новеллы
             :param storyline: Список слайдов для показа
-            :param is_hentai: Присутствует ли контент для взрослых
-            :param is_input_username: Давать ли возможность пользователю ...
-                ... ввести свое имя
+            :param is_hentai: Присутствует ли
+                              контент для взрослых
+            :param is_input_username: Давать ли возможность
+                                      пользователю ввести
+                                      свое имя
         """
         self.name = name
         self.storyline = storyline
@@ -28,11 +31,15 @@ class Novel:
 
     def move(self, choice_id: int = None) -> dict or False:
         """
-            Вернуть информацию об одном слайде начиная с self.slide_id
-            :param choice_id: (int) id выбора на слайде self.slide_id
+            Вернуть информацию об одном слайде
+            начиная с self.slide_id
+
+            :param choice_id: (int) id выбора на слайде
+                              self.slide_id
             :return: slide (dict) or False if this slide is last
         """
-        # пока условия в слайде будут выполнены (если они есть)
+        # пока условия в слайде будут выполнены
+        # (если они есть)
         while True:
             # Если слайда не существует
             if self.slide_id >= len(self.storyline):
@@ -52,10 +59,13 @@ class Novel:
         if 'choice' in slide and choice_id is not None:
             self.player_choices[self.slide_id] = choice_id
             self.slide_id += 1
-            # Возвращаем следующий слайд после выбора
-            # Нужно вызвать еще раз для проверки условий
+            # Возвращаем следующий слайд после
+            # выбора
+
+            # Нужно вызвать еще раз для проверки
+            # условий внутри нового слайда
             return self.move()
-        else:
+        elif 'choice' not in slide:
             self.slide_id += 1
 
         return slide
@@ -71,11 +81,15 @@ class Novel:
 
         move = self.move()
         while move:
-            print(move['text'])  # выводим текст
-            if 'choice' in move:  # Если есть выбор
+            sleep(sleep_time)
+            # Выводим текст
+            print(move['text'])
+
+            # Если есть выбор
+            if 'choice' in move:
                 # Функция для ввода выбора
                 while True:
-                    for i, option in enumerate(move[2]):
+                    for i, option in enumerate(move['choice']):
                         print(f'{i + 1}. {option}')
 
                     inp = input("Введите номер выбора: ")
@@ -84,18 +98,20 @@ class Novel:
                     except ValueError:
                         print("Введенное значение должно быть числом!")
                     else:
-                        if not len(move[2]) >= choice > 0:
-                            print(f"Введите цифру от 1 до {len(move[2])}!")
+                        len_choice = len(move['choice'])
+                        if not len_choice >= choice > 0:
+                            print(f"Введите цифру от 1 до {len_choice}!")
                         else:
                             break
                 choice -= 1
 
-                # Отсылаем move свой выбор
+                # Отсылаем свой выбор
                 move = self.move(choice)
+                print(choice, move)
                 continue
 
-            move = self.move()  # вписываем предыдущий id слайда
-            sleep(sleep_time)
+            # вписываем предыдущий id слайда
+            move = self.move()
 
         print("Новелла закончилась")
 
