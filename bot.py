@@ -1,8 +1,14 @@
+from time import sleep
+
 from vkbottle import Bot, Message, Proxy
 from vkbottle.keyboard import Keyboard, keyboard_gen
 
 from main import Novel
 import config
+
+
+proxy = Proxy(address="http://165.22.64.68:38127")
+bot = Bot(config.token)
 
 
 class BotOutput:
@@ -78,9 +84,14 @@ class BotOutput:
             }
             return player
 
+    def set_activity(self, message: Message, type_activity="typing"):
+        return message.api.request('messages.setActivity',
+            {
+                'type': type_activity,
+                'user_id': message.from_id
+            }
+        )
 
-proxy = Proxy(address="http://212.87.220.2:3128")
-bot = Bot(config.token)
 
 bot_output = BotOutput()
 k_next_slide = keyboard_gen(
@@ -99,8 +110,9 @@ async def on_message(message: Message) -> str or None:
         :param message: object Message
         :returns: str answer or None
     """
-    print("on_message")
-    print(message.payload)
+
+    await bot_output.set_activity(message)
+    sleep(.5)
 
     player = bot_output.get_player_info(message.from_id)
     novel = player['obj']
@@ -126,6 +138,8 @@ async def on_message(message: Message) -> str or None:
         move = novel.move(choice)
         player['is_choice'] = False
     else:
+        if message.payload == '"restart"' or message.text == "!restart":
+            novel.slide_id = 0
         move = novel.move()
 
     if move:
@@ -147,7 +161,17 @@ async def on_message(message: Message) -> str or None:
             # Возвращаем текст и аттачи
             await message(move['text'], attachment, keyboard=k_next_slide)
     else:
-        await message("Новелла закончена.", keyboard=keyboard_gen([]))
+        await message("Новелла закончена.\n" +
+                      "Чтобы перезапустить, напишите " +
+                      "!restart или нажмите кнопку " +
+                      "на клавиатуре.",
+                      keyboard=keyboard_gen(
+                        [[{
+                            "text": "Начать заново",
+                            "payload": '"restart"',
+                            "color": "positive"
+                        }]])
+                      )
 
 
 if __name__ == '__main__':

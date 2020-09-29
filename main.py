@@ -27,7 +27,7 @@ class Novel:
         self.username = None if is_input_username else False
 
         self.player_choices = {}
-        self.slide_id = 2
+        self.slide_id = 0
 
     def move(self, choice_id: int = None) -> dict or False:
         """
