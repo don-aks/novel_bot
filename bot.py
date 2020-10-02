@@ -7,16 +7,129 @@ from main import Novel
 import config
 
 
-proxy = Proxy(address="http://165.22.64.68:38127")
-bot = Bot(config.token)
-
-
 class BotOutput:
     players = {}
 
-    def generate_keyboard(self,
-                          array: list,
-                          color="secondary") -> Keyboard or False:
+    def on_message(self, message: Message) -> tuple:
+        player = self.__get_player_info(message.from_id)
+        if player['state'] == 'game' or message.payload == '"game"':
+            player['state'] = 'game'
+            return self.move(message, player)
+        elif player['state'] == 'menu' or message.payload == '"menu"':
+            player['state'] = 'menu'
+            return self.show_menu(message, player)
+
+    def show_menu(self, message: Message, player: dict) -> tuple:
+        if message.text == "!play":
+            player['state'] = 'game'
+            return self.move(message, player)
+        return (
+                "Меню.\n" +
+                "Используйте клавиатуру " +
+                "или текстовые команды:\n" +
+                "!play - Играть.",
+                keyboard_gen([[
+                    {
+                        "text": "Играть!",
+                        "color": "positive",
+                        "payload": '"game"'
+                    }
+                ]])
+        )
+
+    def move(self, message: Message, player: dict) -> tuple:
+        """
+            Шаг вперед в новелле для
+            игрока, отправивший message
+        """
+        player = self.__get_player_info(message.from_id)
+        novel = player['obj']
+
+        if player['is_choice']:
+            if message.payload is not None:
+                choice = int(message.payload) - 1
+            else:
+                # Проверять, является ли введенное
+                # сообщение выбором.
+                try:
+                    choice = int(message.text)
+                except ValueError:
+                    return (
+                        "Введите число или используйте клавиатуру!"
+                    )
+                else:
+                    len_choice = len(novel.storyline[novel.slide_id]['choice'])
+                    if not len_choice >= choice > 0:
+                        return (
+                            f"Введите число от 1 до {len_choice}"+
+                            "или используйте клавиатуру!"
+                        )
+
+                choice -= 1
+
+            move = novel.move(choice)
+            player['is_choice'] = False
+        else:
+            if message.payload == '"restart"' or message.text == "!restart":
+                novel.slide_id = 0
+            # Menu
+            elif message.payload == '"menu"' or message.text == "!menu":
+                player['state'] = 'menu'
+                return self.show_menu(message, player)
+            move = novel.move()
+
+        if move:
+            attachment = None
+            if 'attachment' in move:
+                attachment = move['attachment']
+            # Если есть выбор
+            if 'choice' in move:
+                answer = move['text']+'\n'
+                for i, option in enumerate(move['choice']):
+                    answer += f"\n{i+1}. {option}"
+
+                player['is_choice'] = True
+                return (
+                    answer,
+                    self.__generate_choice_keyboard(move['choice']),
+                    attachment
+                )
+            else:
+                # Возвращаем текст и аттачи
+                return (
+                    move['text'],
+                    keyboard_gen(
+                        [[
+                            {'text': "Дальше ➡", "color": "primary"}
+                        ]]
+                    ),
+                    attachment
+                )
+        else:
+            return ("Новелла закончена.\n" +
+                    "Используйте клавиатуру " +
+                    "или текстовые команды: \n" +
+                    "!restart - Перезапустить новеллу.\n" +
+                    "!menu - Выход в меню.",
+                    keyboard_gen(
+                        [
+                            [{
+                                "text": "Начать заново",
+                                "payload": '"restart"',
+                                "color": "positive"
+                            }],
+                            [{
+                                "text": "В меню",
+                                "payload": '"menu"',
+                                "color": "negative"
+                            }]
+                        ]
+                    )
+                    )
+
+    def __generate_choice_keyboard(self,
+                                   array: list,
+                                   color="secondary") -> Keyboard or False:
         """
             Функция генерирует клавиатуру
             из массива выбора.
@@ -64,7 +177,7 @@ class BotOutput:
         else:
             return False
 
-    def get_player_info(self, vk_id: int) -> dict:
+    def __get_player_info(self, vk_id: int) -> dict:
         """
             Возвращает информацию об игроке.
             Если игрока нет, создает.
@@ -80,99 +193,46 @@ class BotOutput:
                     "Зомби апокалипсис на корабле",
                     config.example_storyline, False, False
                 ),
-                "is_choice": False
+                "is_choice": False,
+                "state": "menu"
             }
             return player
 
-    def set_activity(self, message: Message, type_activity="typing"):
-        return message.api.request('messages.setActivity',
+    def __set_activity(self, message: Message, activity="typing"):
+        return message.api.request(
+            'messages.setActivity',
             {
-                'type': type_activity,
+                'type': activity,
                 'user_id': message.from_id
             }
         )
 
 
-bot_output = BotOutput()
-k_next_slide = keyboard_gen(
-    [
-        [
-            {'text': "Дальше ➡", "color": "primary"}
-        ]
-    ]
-)
+proxy = Proxy(address="http://192.252.223.147:3128")
+bot = Bot(config.token)
+bot_out = BotOutput()
 
 
 @bot.on.message()
 async def on_message(message: Message) -> str or None:
-    """
-        Реагирует на новые сообщения в ВК.
-        :param message: object Message
-        :returns: str answer or None
-    """
+    """Handler VK messages"""
 
-    await bot_output.set_activity(message)
-    sleep(.5)
+    answer = bot_out.on_message(message)
 
-    player = bot_output.get_player_info(message.from_id)
-    novel = player['obj']
+    text = None
+    keyboard = None
+    attachment = None
 
-    if player['is_choice']:
-        if message.payload is not None:
-            choice = int(message.payload) - 1
-        else:
-            # Проверять, является ли введенное
-            # сообщение выбором.
-            try:
-                choice = int(message.text)
-            except ValueError:
-                return "Введите число или используйте клавиатуру!"
-            else:
-                len_choice = len(novel.storyline[novel.slide_id]['choice'])
-                if not len_choice >= choice > 0:
-                    return (f"Введите число от 1 до {len_choice}"+
-                            "или используйте клавиатуру!")
+    if len(answer) == 0:
+        return False
+    if len(answer) >= 1:
+        text = answer[0]
+    if len(answer) >= 2:
+        keyboard = answer[1]
+    if len(answer) >= 3:
+        attachment = answer[2]
 
-            choice -= 1
-
-        move = novel.move(choice)
-        player['is_choice'] = False
-    else:
-        if message.payload == '"restart"' or message.text == "!restart":
-            novel.slide_id = 0
-        move = novel.move()
-
-    if move:
-        attachment = None
-        if 'attachment' in move:
-            attachment = move['attachment']
-        # Если есть выбор
-        if 'choice' in move:
-            answer = move['text']+'\n'
-            for i, option in enumerate(move['choice']):
-                answer += f"\n{i+1}. {option}"
-
-            player['is_choice'] = True
-            await message(
-                answer, attachment,
-                keyboard=bot_output.generate_keyboard(move['choice'])
-            )
-        else:
-            # Возвращаем текст и аттачи
-            await message(move['text'], attachment, keyboard=k_next_slide)
-    else:
-        await message("Новелла закончена.\n" +
-                      "Чтобы перезапустить, напишите " +
-                      "!restart или нажмите кнопку " +
-                      "на клавиатуре.",
-                      keyboard=keyboard_gen(
-                        [[{
-                            "text": "Начать заново",
-                            "payload": '"restart"',
-                            "color": "positive"
-                        }]])
-                      )
-
+    await message(text, attachment, keyboard=keyboard)
 
 if __name__ == '__main__':
     bot.run_polling()
