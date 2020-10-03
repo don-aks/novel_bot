@@ -18,6 +18,21 @@ class BotOutput:
 
     def __init__(self):
         self.players = {}
+        self.novels = []
+        # test novel
+        self.novels.append({
+            "name": "Зомби-апокалипсис на корабле",
+            "descr": "Вы просыпаетесь на корабле и вдруг...",
+            "genre": "Зомби",
+            "storyline": config.example_storyline,
+            "author_id": 248015237,
+            "url": "test",
+            "img": "photo-29559271_456242468",
+            "is_public": True,
+            "is_hentai": False,
+            "is_input_username": True,
+            "typing_delay": 0.3
+        })
 
     def on_message(self, message: Message) -> dict:
         """
@@ -28,12 +43,26 @@ class BotOutput:
             :return: dict answer
         """
         player = self.__get_player_info(message.from_id)
-        if player['section'] == 'game' or message.payload == '"game"':
-            player['section'] = 'game'
+
+        # Analyse message
+        if message.payload:
+            # Удаляем кавычки,
+            # так как payload принимает только json.
+            message.payload = message.payload.replace('"', '')
+
+            # Если payload это вызов секции
+            if message.payload in ('game', 'menu', 'editor'):
+                player['section'] = message.payload
+        elif message.text in ('!game', '!menu', '!editor'):
+            player['section'] = message.text.replace('!', '')
+
+        # Call methods
+        if player['section'] == 'game':
             return self.__game_step(message, player)
-        elif player['section'] == 'menu' or message.payload == '"menu"':
-            player['section'] = 'menu'
+        elif player['section'] == 'menu':
             return self.__show_menu(message, player)
+        elif player['section'] == 'editor':
+            return self.__novel_editor(message, player)
 
     def __get_player_info(self, vk_id: int) -> dict:
         """
@@ -48,12 +77,16 @@ class BotOutput:
             return self.players[vk_id]
         else:
             player = self.players[vk_id] = {
-                "obj": Novel(
-                    "Зомби апокалипсис на корабле",
-                    config.example_storyline, False, False
-                ),
-                "is_choice": False,
-                "section": "menu"
+                "section": "menu",
+                "storyline_in_editor": None,
+                "own_novels_id": None,
+                "game_novel_id": None,
+                "game_slide_id": 0,
+
+                # Params not for BD
+                "game_obj": None,
+                "game_is_choice": False,
+                "game_is_input_username": False
             }
             return player
 
@@ -64,14 +97,11 @@ class BotOutput:
             :param player: element self.players
             :return: output message
         """
-        if message.text == "!play":
-            player['section'] = 'game'
-            return self.__game_step(message, player)
         return {
                 "text": "Меню.\n" +
                 "Используйте клавиатуру " +
                 "или текстовые команды:\n" +
-                "!play - Играть.",
+                "!game - Играть.",
 
                 "keyboard": keyboard_gen([[
                     {
@@ -91,9 +121,34 @@ class BotOutput:
             :return: output message
         """
         player = self.__get_player_info(message.from_id)
-        novel = player['obj']
+        # Не выбрана новелла
+        if player['game_novel_id'] is None:
+            # Перейти в каталог.
+            player['game_novel_id'] = 0
 
-        if player['is_choice']:
+        novel_dict = self.novels[player['game_novel_id']]
+
+        # Не создан объект новеллы
+        if player['game_obj'] is None:
+            player['game_obj'] = Novel(
+                novel_dict['storyline'],
+                player['game_slide_id'],
+                novel_dict['is_input_username']
+            )
+
+        novel = player['game_obj']
+
+        if novel.slide_id == 0 and novel.is_input_username:
+            if player['game_is_input_username']:
+                novel.username = message.text
+            else:
+                player['game_is_input_username'] = True
+                return {
+                    "text": "Введи свое имя:",
+                    "keyboard": keyboard_gen([])
+                }
+
+        if player['game_is_choice']:
             if message.payload is not None:
                 choice = int(message.payload) - 1
             else:
@@ -115,42 +170,40 @@ class BotOutput:
 
                 choice -= 1
 
-            move = novel.step(choice)
-            player['is_choice'] = False
+            step = novel.step(choice)
+            player['game_is_choice'] = False
         else:
-            if message.payload == '"restart"' or message.text == "!restart":
+            if message.payload == 'restart' or message.text == "!restart":
                 novel.slide_id = 0
-            # Menu
-            elif message.payload == '"menu"' or message.text == "!menu":
-                player['section'] = 'menu'
-                return self.__show_menu(message, player)
-            move = novel.step()
+            step = novel.step()
 
-        if move:
-            attachment = move.get('attachment')
+        if step:
+            attachment = step.get('attachment')
             # Если есть выбор
-            if 'choice' in move:
-                answer = move['text']+'\n'
-                for i, option in enumerate(move['choice']):
+            if 'choice' in step:
+                answer = step['text']+'\n'
+                for i, option in enumerate(step['choice']):
                     answer += f"\n{i+1}. {option}"
 
-                player['is_choice'] = True
+                player['game_is_choice'] = True
                 return {
                     "text": answer,
-                    "keyboard": self.__generate_choice_keyboard(move['choice']),
-                    "attachment": attachment
+                    "keyboard": self.__generate_choice_keyboard(step['choice']),
+                    "attachment": attachment,
+                    "typing_delay": novel_dict['typing_delay']
                 }
 
             else:
                 # Возвращаем текст и аттачи
                 return {
-                    "text": move['text'],
+                    "text": step['text'],
                     "keyboard": keyboard_gen(
                         [[
                             {'text': "Дальше ➡", "color": "primary"}
                         ]]
                     ),
-                    "attachment": attachment
+                    "attachment": attachment,
+                    "typing_delay": novel_dict['typing_delay']
                 }
 
         else:
@@ -176,6 +229,13 @@ class BotOutput:
                             ]
                         )
                     }
+
+    def __novel_editor(self, message, player) -> dict:
+        if player['storyline_in_editor'] is None:
+            player['storyline_in_editor'] = []
+            return {
+                "text": "Отправляйте сообщение для добавления слайдов."
+            }
 
     def __generate_choice_keyboard(self,
                                    array: list,
@@ -227,18 +287,10 @@ class BotOutput:
         else:
             return False
 
-    def __set_activity(self, message: Message, activity="typing"):
-        return message.api.request(
-            'messages.setActivity',
-            {
-                'type': activity,
-                'user_id': message.from_id
-            }
-        )
-
 
 proxy = Proxy(address="http://165.22.64.68:37499")
 vk_bot = Bot(config.token)
+
 bot_out = BotOutput()
 
 
@@ -251,6 +303,16 @@ async def on_message(message: Message):
     """
 
     ans = bot_out.on_message(message)
+
+    if ans.get('typing_delay'):
+        await message.api.request(
+            'messages.setActivity',
+            {
+                'type': 'typing',
+                'user_id': message.from_id
+            }
+        )
+        sleep(ans['typing_delay'])
 
     await message(
         ans.get('text'),
