@@ -52,8 +52,12 @@ class BotOutput:
 
             # Если payload это вызов секции
             if message.payload in ('game', 'menu', 'editor'):
+                if player['section'] == 'game':
+                    self.__remove_player_game_flags(player)
                 player['section'] = message.payload
         elif message.text in ('!game', '!menu', '!editor'):
+            if player['section'] == 'game':
+                self.__remove_player_game_flags(player)
             player['section'] = message.text.replace('!', '')
 
         # Call methods
@@ -77,16 +81,17 @@ class BotOutput:
             return self.players[vk_id]
         else:
             player = self.players[vk_id] = {
-                "section": "menu",
-                "storyline_in_editor": None,
-                "own_novels_id": None,
-                "game_novel_id": None,
-                "game_slide_id": 0,
+                "section": "menu",  # str
+                "storyline_in_editor": None,  # list
+                "own_novels_id": None,  # int
+                "game_novel_id": None,  # int
+                "game_slide_id": 3,     # int
+                "game_vars": {'choice': {2: 1}},  # dict
 
                 # Params not for BD
-                "game_obj": None,
-                "game_is_choice": False,
-                "game_is_input_username": False
+                "game_obj": None,  # Novel
+                "game_is_choice": False,  # bool
+                "game_is_input_username": False  # bool
             }
             return player
 
@@ -135,6 +140,18 @@ class BotOutput:
                 player['game_slide_id'],
                 novel_dict['is_input_username']
             )
+
+            novel = player['game_obj']
+
+            # Добавляем все переменные в объект
+            if isinstance(player['game_vars'], dict):
+                for key, value in player['game_vars'].items():
+                    if key == 'choice':
+                        player['game_obj'].player_choices = value
+                    elif key == 'username':
+                        player['game_obj'].username = value
+                    else:
+                        player['game_obj'].vars[key] = value
 
         novel = player['game_obj']
 
@@ -287,8 +304,22 @@ class BotOutput:
         else:
             return False
 
+    def __remove_player_game_flags(self, player: dict):
+        """
+            Переводит флаги игрока player:
+            game_is_choice,
+            game_is_input_username
+            в положение False.
 
-proxy = Proxy(address="http://165.22.64.68:37499")
+            Используется чтобы при переходе
+            в игру тебе показали сообщения
+            с выбором и вводом имени заново.
+        """
+        player['game_is_choice'] = False
+        player['game_is_input_username'] = False
+
+
+proxy = Proxy(address="http://163.172.114.14:3838")
 vk_bot = Bot(config.token)
 
 bot_out = BotOutput()
