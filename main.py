@@ -140,7 +140,7 @@ class Novel:
                     return False
             # Пользовательские переменные
             else:
-                if self.vars.get[key] != value:
+                if self.vars.get(key) != value:
                     return False
 
         return True
