@@ -9,25 +9,27 @@ class Novel:
         для одного игрока.
     """
 
-    def __init__(self, name: str, storyline: list,
-                 is_hentai: bool, is_input_username: bool):
+    def __init__(self,
+                 storyline: list,
+                 slide_id: int = 0,
+                 is_input_username: bool = False,
+                 username: str = None):
         """
-            :param name: Имя новеллы
-            :param storyline: Список слайдов для показа
-            :param is_hentai: Присутствует ли
-                              контент для взрослых
-            :param is_input_username: Давать ли возможность
-                                      пользователю ввести
-                                      свое имя
+            :param storyline: Список слайдов для показа.
+            :param slide_id: id слайда с которого
+                             начинать показ.
+            :param is_input_username: Нужно ли
+                                      имя пользователя.
+            :param username: Имя пользователя.
+                             По умолчанию None.
         """
-        self.name = name
         self.storyline = storyline
-        self.is_hentai = is_hentai
         self.is_input_username = is_input_username
-        self.username = None if is_input_username else False
+        self.username = username
 
         self.player_choices = {}
-        self.slide_id = 0
+        self.slide_id = slide_id
+        self.vars = {}
 
     def step(self, choice_id: int = None) -> dict or False:
         """
@@ -36,10 +38,16 @@ class Novel:
 
             :param choice_id: (int) id выбора на слайде
                               self.slide_id
-            :return: slide (dict) or False if this slide is last
+            :return: slide (dict)
+                     or False if this slide is last
         """
         # пока условия в слайде будут выполнены
         # (если они есть)
+
+        if (self.slide_id == 0 and self.is_input_username
+           and not (isinstance(self.username, str) or self.username)):
+            raise NameError("self.username is empty.")
+
         while True:
             # Если слайда не существует
             if self.slide_id >= len(self.storyline):
@@ -75,21 +83,20 @@ class Novel:
             Играть в консоле.
             :param sleep_time: (int) delay show slides in seconds
         """
-        print(f'Вы начали играть в новеллу "{self.name}"')
         if self.is_input_username:
             self.username = input("Введите свое имя: ")
 
-        move = self.step()
-        while move:
+        step = self.step()
+        while step:
             sleep(sleep_time)
             # Выводим текст
-            print(move['text'])
+            print(step['text'])
 
             # Если есть выбор
-            if 'choice' in move:
+            if 'choice' in step:
                 # Функция для ввода выбора
                 while True:
-                    for i, option in enumerate(move['choice']):
+                    for i, option in enumerate(step['choice']):
                         print(f'{i + 1}. {option}')
 
                     inp = input("Введите номер выбора: ")
@@ -98,7 +105,7 @@ class Novel:
                     except ValueError:
                         print("Введенное значение должно быть числом!")
                     else:
-                        len_choice = len(move['choice'])
+                        len_choice = len(step['choice'])
                         if not len_choice >= choice > 0:
                             print(f"Введите цифру от 1 до {len_choice}!")
                         else:
@@ -106,12 +113,11 @@ class Novel:
                 choice -= 1
 
                 # Отсылаем свой выбор
-                move = self.step(choice)
-                print(choice, move)
+                step = self.step(choice)
                 continue
 
             # вписываем предыдущий id слайда
-            move = self.step()
+            step = self.step()
 
         print("Новелла закончилась")
 
@@ -123,15 +129,23 @@ class Novel:
         """
         for key, value in conditions.items():
             if key == "choice":
+                # Если один выбор
                 if not isinstance(value[1], list):
                     value = [value]
                 for arr in value:
                     if self.player_choices.get(arr[0]) != arr[1]:
                         return False
+            elif key == "username":
+                if self.username != value:
+                    return False
+            # Пользовательские переменные
+            else:
+                if self.vars.get[key] != value:
+                    return False
 
         return True
 
 
 if __name__ == '__main__':
-    novel = Novel("test", config.example_storyline, False, False)
+    novel = Novel(config.example_storyline, is_input_username=True)
     novel.play_in_console()
