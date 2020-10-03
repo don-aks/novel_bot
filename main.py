@@ -6,7 +6,7 @@ import config
 class Novel:
     """
         Класс, содержащий новеллу
-        с одним игроком
+        для одного игрока.
     """
 
     def __init__(self, name: str, storyline: list,
@@ -29,7 +29,7 @@ class Novel:
         self.player_choices = {}
         self.slide_id = 0
 
-    def move(self, choice_id: int = None) -> dict or False:
+    def step(self, choice_id: int = None) -> dict or False:
         """
             Вернуть информацию об одном слайде
             начиная с self.slide_id
@@ -48,7 +48,7 @@ class Novel:
             slide = self.storyline[self.slide_id]
             # Есть ли условие в слайде
             if 'if' in slide:
-                if self._is_condition(slide['if']):
+                if self.__is_condition(slide['if']):
                     break
                 else:
                     self.slide_id += 1
@@ -64,7 +64,7 @@ class Novel:
 
             # Нужно вызвать еще раз для проверки
             # условий внутри нового слайда
-            return self.move()
+            return self.step()
         elif 'choice' not in slide:
             self.slide_id += 1
 
@@ -79,7 +79,7 @@ class Novel:
         if self.is_input_username:
             self.username = input("Введите свое имя: ")
 
-        move = self.move()
+        move = self.step()
         while move:
             sleep(sleep_time)
             # Выводим текст
@@ -106,16 +106,16 @@ class Novel:
                 choice -= 1
 
                 # Отсылаем свой выбор
-                move = self.move(choice)
+                move = self.step(choice)
                 print(choice, move)
                 continue
 
             # вписываем предыдущий id слайда
-            move = self.move()
+            move = self.step()
 
         print("Новелла закончилась")
 
-    def _is_condition(self, conditions: dict) -> bool:
+    def __is_condition(self, conditions: dict) -> bool:
         """
             Проверка условий conditions
             :param conditions: dict conditions in slide

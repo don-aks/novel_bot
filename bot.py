@@ -8,39 +8,87 @@ import config
 
 
 class BotOutput:
-    players = {}
+    """
+        Класс предназначен для
+        взаимодействия с игроком.
+        Здесь вся логика бота.
+        Методы возвращают словарь с
+        новым сообщением юзеру.
+    """
 
-    def on_message(self, message: Message) -> tuple:
+    def __init__(self):
+        self.players = {}
+
+    def on_message(self, message: Message) -> dict:
+        """
+            Главный метод.
+            Анализирует сообщение пользователя
+            message и на основе него вызывает
+            метод для ответа.
+            :return: dict answer
+        """
         player = self.__get_player_info(message.from_id)
-        if player['state'] == 'game' or message.payload == '"game"':
-            player['state'] = 'game'
-            return self.move(message, player)
-        elif player['state'] == 'menu' or message.payload == '"menu"':
-            player['state'] = 'menu'
-            return self.show_menu(message, player)
+        if player['section'] == 'game' or message.payload == '"game"':
+            player['section'] = 'game'
+            return self.__game_step(message, player)
+        elif player['section'] == 'menu' or message.payload == '"menu"':
+            player['section'] = 'menu'
+            return self.__show_menu(message, player)
 
-    def show_menu(self, message: Message, player: dict) -> tuple:
+    def __get_player_info(self, vk_id: int) -> dict:
+        """
+            Возвращает информацию об игроке
+            в словаре self.players.
+            Если игрока нет, создает его.
+
+            :param vk_id: player id in vk
+            :return: dict player from self.players
+        """
+        if vk_id in self.players:
+            return self.players[vk_id]
+        else:
+            player = self.players[vk_id] = {
+                "obj": Novel(
+                    "Зомби апокалипсис на корабле",
+                    config.example_storyline, False, False
+                ),
+                "is_choice": False,
+                "section": "menu"
+            }
+            return player
+
+    def __show_menu(self, message: Message, player: dict) -> dict:
+        """
+            Возвращает интерфейс меню.
+            :param message: Message
+            :param player: element self.players
+            :return: output message
+        """
         if message.text == "!play":
-            player['state'] = 'game'
-            return self.move(message, player)
-        return (
-                "Меню.\n" +
+            player['section'] = 'game'
+            return self.__game_step(message, player)
+        return {
+                "text": "Меню.\n" +
                 "Используйте клавиатуру " +
                 "или текстовые команды:\n" +
                 "!play - Играть.",
-                keyboard_gen([[
+
+                "keyboard": keyboard_gen([[
                     {
                         "text": "Играть!",
                         "color": "positive",
                         "payload": '"game"'
                     }
                 ]])
-        )
+        }
 
-    def move(self, message: Message, player: dict) -> tuple:
+    def __game_step(self, message: Message, player: dict) -> dict:
         """
             Шаг вперед в новелле для
-            игрока, отправивший message
+            игрока player.
+            :param message: Message
+            :param player: element self.players
+            :return: output message
         """
         player = self.__get_player_info(message.from_id)
         novel = player['obj']
@@ -54,34 +102,32 @@ class BotOutput:
                 try:
                     choice = int(message.text)
                 except ValueError:
-                    return (
-                        "Введите число или используйте клавиатуру!"
-                    )
+                    return {
+                        "text": "Введите число или используйте клавиатуру!"
+                    }
                 else:
                     len_choice = len(novel.storyline[novel.slide_id]['choice'])
                     if not len_choice >= choice > 0:
-                        return (
-                            f"Введите число от 1 до {len_choice}"+
+                        return {
+                            "text": f"Введите число от 1 до {len_choice}" +
                             "или используйте клавиатуру!"
-                        )
+                        }
 
                 choice -= 1
 
-            move = novel.move(choice)
+            move = novel.step(choice)
             player['is_choice'] = False
         else:
             if message.payload == '"restart"' or message.text == "!restart":
                 novel.slide_id = 0
             # Menu
             elif message.payload == '"menu"' or message.text == "!menu":
-                player['state'] = 'menu'
-                return self.show_menu(message, player)
-            move = novel.move()
+                player['section'] = 'menu'
+                return self.__show_menu(message, player)
+            move = novel.step()
 
         if move:
-            attachment = None
-            if 'attachment' in move:
-                attachment = move['attachment']
+            attachment = move.get('attachment')
             # Если есть выбор
             if 'choice' in move:
                 answer = move['text']+'\n'
@@ -89,43 +135,47 @@ class BotOutput:
                     answer += f"\n{i+1}. {option}"
 
                 player['is_choice'] = True
-                return (
-                    answer,
-                    self.__generate_choice_keyboard(move['choice']),
-                    attachment
-                )
+                return {
+                    "text": answer,
+                    "keyboard": self.__generate_choice_keyboard(move['choice']),
+                    "attachment": attachment
+                }
+
             else:
                 # Возвращаем текст и аттачи
-                return (
-                    move['text'],
-                    keyboard_gen(
+                return {
+                    "text": move['text'],
+                    "keyboard": keyboard_gen(
                         [[
                             {'text': "Дальше ➡", "color": "primary"}
                         ]]
                     ),
-                    attachment
-                )
+                    "attachment": attachment
+                }
+
         else:
-            return ("Новелла закончена.\n" +
-                    "Используйте клавиатуру " +
-                    "или текстовые команды: \n" +
-                    "!restart - Перезапустить новеллу.\n" +
-                    "!menu - Выход в меню.",
-                    keyboard_gen(
-                        [
-                            [{
-                                "text": "Начать заново",
-                                "payload": '"restart"',
-                                "color": "positive"
-                            }],
-                            [{
-                                "text": "В меню",
-                                "payload": '"menu"',
-                                "color": "negative"
-                            }]
-                        ]
-                    )
-                    )
+            return {
+                        "text": "Новелла закончена.\n" +
+                        "Используйте клавиатуру " +
+                        "или текстовые команды: \n" +
+                        "!restart - Перезапустить новеллу.\n" +
+                        "!menu - Выход в меню.",
+
+                        "keyboard": keyboard_gen(
+                            [
+                                [{
+                                    "text": "Начать заново",
+                                    "payload": '"restart"',
+                                    "color": "positive"
+                                }],
+                                [{
+                                    "text": "В меню",
+                                    "payload": '"menu"',
+                                    "color": "negative"
+                                }]
+                            ]
+                        )
+                    }
 
     def __generate_choice_keyboard(self,
                                    array: list,
@@ -141,8 +191,8 @@ class BotOutput:
 
             :param array: array choices
             :param color: color buttons
-            :returns: object Keyboard or False
-                      if len(array) > 10
+            :return: object Keyboard
+                      or False if len(array) > 10
         """
         if len(array) <= 5:
             # [1, 2, 3, 4, 5] => [[1], [2], [3], [4], [5]]
@@ -177,27 +227,6 @@ class BotOutput:
         else:
             return False
 
-    def __get_player_info(self, vk_id: int) -> dict:
-        """
-            Возвращает информацию об игроке.
-            Если игрока нет, создает.
-
-            :param vk_id: player id in vk
-            :returns: dict player from self.players
-        """
-        if vk_id in self.players:
-            return self.players[vk_id]
-        else:
-            player = self.players[vk_id] = {
-                "obj": Novel(
-                    "Зомби апокалипсис на корабле",
-                    config.example_storyline, False, False
-                ),
-                "is_choice": False,
-                "state": "menu"
-            }
-            return player
-
     def __set_activity(self, message: Message, activity="typing"):
         return message.api.request(
             'messages.setActivity',
@@ -208,31 +237,26 @@ class BotOutput:
         )
 
 
-proxy = Proxy(address="http://192.252.223.147:3128")
-bot = Bot(config.token)
+proxy = Proxy(address="http://165.22.64.68:37499")
+vk_bot = Bot(config.token)
 bot_out = BotOutput()
 
 
-@bot.on.message()
-async def on_message(message: Message) -> str or None:
-    """Handler VK messages"""
+@vk_bot.on.message()
+async def on_message(message: Message):
+    """
+        Когда приходит новое сообщение,
+        вызывает метод on_message класса BotOutput
+        и отсылает пользователю что получил.
+    """
 
-    answer = bot_out.on_message(message)
+    ans = bot_out.on_message(message)
 
-    text = None
-    keyboard = None
-    attachment = None
-
-    if len(answer) == 0:
-        return False
-    if len(answer) >= 1:
-        text = answer[0]
-    if len(answer) >= 2:
-        keyboard = answer[1]
-    if len(answer) >= 3:
-        attachment = answer[2]
-
-    await message(text, attachment, keyboard=keyboard)
+    await message(
+        ans.get('text'),
+        ans.get('attachment'),
+        keyboard=ans.get('keyboard')
+    )
 
 if __name__ == '__main__':
-    bot.run_polling()
+    vk_bot.run_polling()
