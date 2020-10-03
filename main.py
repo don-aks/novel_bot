@@ -129,12 +129,22 @@ class Novel:
         """
         for key, value in conditions.items():
             if key == "choice":
-                # Если один выбор
-                if not isinstance(value[1], list):
+                operator = 'and'
+                # Если несколько выборов
+                if isinstance(value[1], list):
+                    operator = value.pop(0)
+                else:
                     value = [value]
                 for arr in value:
-                    if self.player_choices.get(arr[0]) != arr[1]:
+                    if (operator == 'and' and
+                       self.player_choices.get(arr[0]) != arr[1]):
                         return False
+                    elif operator == 'or':
+                        if self.player_choices.get(arr[0]) == arr[1]:
+                            break  # True
+                        elif arr == value[-1]:
+                            return False
+                    print()
             elif key == "username":
                 if self.username != value:
                     return False
