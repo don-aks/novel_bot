@@ -1,3 +1,4 @@
+from typing import List, Optional
 from time import sleep
 
 import config
@@ -9,11 +10,13 @@ class Novel:
         для одного игрока.
     """
 
-    def __init__(self,
-                 storyline: list,
-                 slide_id: int = 0,
-                 is_input_username: bool = False,
-                 username: str = None):
+    def __init__(
+        self,
+        storyline: List[dict],
+        slide_id: int = 0,
+        is_input_username: bool = False,
+        username: str = None
+    ):
         """
             :param storyline: Список слайдов для показа.
             :param slide_id: id слайда с которого
@@ -31,15 +34,16 @@ class Novel:
         self.slide_id = slide_id
         self.vars = {}
 
-    def step(self, choice_id: int = None) -> dict or False:
+    def step(self, choice_id: int = None) -> Optional[dict]:
         """
             Вернуть информацию об одном слайде
             начиная с self.slide_id
 
-            :param choice_id: (int) id выбора на слайде
+            :param choice_id: id выбора на слайде
                               self.slide_id
-            :return: slide (dict)
-                     or False if this slide is last
+            :return: словарь slide из массива self.storyline
+                     или None если этот слайд
+                     последний
         """
         # пока условия в слайде будут выполнены
         # (если они есть)
@@ -51,7 +55,7 @@ class Novel:
         while True:
             # Если слайда не существует
             if self.slide_id >= len(self.storyline):
-                return False
+                return None
 
             slide = self.storyline[self.slide_id]
             # Есть ли условие в слайде
@@ -78,10 +82,11 @@ class Novel:
 
         return slide
 
-    def play_in_console(self, sleep_time: int = 0):
+    def play_in_console(self, sleep_time: int = 0) -> None:
         """
             Играть в консоле.
-            :param sleep_time: (int) delay show slides in seconds
+            :param sleep_time: задержка между показом
+                               слайдов в секундах
         """
         if self.is_input_username:
             self.username = input("Введите свое имя: ")
@@ -124,8 +129,8 @@ class Novel:
     def __is_condition(self, conditions: dict) -> bool:
         """
             Проверка условий conditions
-            :param conditions: dict conditions in slide
-            :return: bool
+            :param conditions: словарь "if" в слайде
+            :return: True или False
         """
         for key, value in conditions.items():
             if key == "choice":

@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Union
 from time import sleep
 
 from vkbottle import Bot, Message, Proxy
@@ -34,13 +35,16 @@ class BotOutput:
             "typing_delay": 0.3
         })
 
-    def on_message(self, message: Message) -> dict:
+    def on_message(
+        self,
+        message: Message
+    ) -> Dict[str, Union[str, Keyboard, None]]:
         """
             Главный метод.
             Анализирует сообщение пользователя
             message и на основе него вызывает
             метод для ответа.
-            :return: dict answer
+            :return: словарь с методами сообщения
         """
         player = self.__get_player_info(message.from_id)
 
@@ -51,11 +55,11 @@ class BotOutput:
             message.payload = message.payload.replace('"', '')
 
             # Если payload это вызов секции
-            if message.payload in ('game', 'menu', 'editor'):
+            if message.payload in ('game', 'menu', 'editor', 'settings'):
                 if player['section'] == 'game':
                     self.__remove_player_game_flags(player)
                 player['section'] = message.payload
-        elif message.text in ('!game', '!menu', '!editor'):
+        elif message.text in ('!game', '!menu', '!editor', '!settings'):
             if player['section'] == 'game':
                 self.__remove_player_game_flags(player)
             player['section'] = message.text.replace('!', '')
@@ -67,15 +71,21 @@ class BotOutput:
             return self.__show_menu(message, player)
         elif player['section'] == 'editor':
             return self.__novel_editor(message, player)
+        elif player['section'] == 'settings':
+            return self.__show_settings(message, player)
 
-    def __get_player_info(self, vk_id: int) -> dict:
+    def __get_player_info(
+        self,
+        vk_id: int
+    ) -> Dict[str, Union[str, Keyboard, None]]:
         """
             Возвращает информацию об игроке
             в словаре self.players.
             Если игрока нет, создает его.
 
-            :param vk_id: player id in vk
-            :return: dict player from self.players
+            :param vk_id: id в vk игрока
+            :return: подсловарь player
+                     из словаря self.players
         """
         if vk_id in self.players:
             return self.players[vk_id]
@@ -85,8 +95,8 @@ class BotOutput:
                 "storyline_in_editor": None,  # list
                 "own_novels_id": None,  # int
                 "game_novel_id": None,  # int
-                "game_slide_id": 3,     # int
-                "game_vars": {'choice': {2: 1}},  # dict
+                "game_slide_id": 0,     # int
+                "game_vars": None,      # dict
 
                 # Params not for BD
                 "game_obj": None,  # Novel
@@ -95,7 +105,11 @@ class BotOutput:
             }
             return player
 
-    def __show_menu(self, message: Message, player: dict) -> dict:
+    def __show_menu(
+        self,
+        message: Message,
+        player: Dict[str, Any]
+    ) -> Dict[str, Union[str, Keyboard, None]]:
         """
             Возвращает интерфейс меню.
             :param message: Message
@@ -106,18 +120,36 @@ class BotOutput:
                 "text": "Меню.\n" +
                 "Используйте клавиатуру " +
                 "или текстовые команды:\n" +
-                "!game - Играть.",
+                "!game - Играть.\n" +
+                "!editor - Редактор новелл.\n" +
+                "!settings - Настройки.",
 
-                "keyboard": keyboard_gen([[
-                    {
-                        "text": "Играть!",
+                "keyboard": keyboard_gen([
+                    [{
+                        "text": "🎮 Играть!",
                         "color": "positive",
                         "payload": '"game"'
-                    }
-                ]])
+                    }],
+                    [
+                        {
+                            "text": "✏ Редактор",
+                            "color": "negative",
+                            "payload": '"editor"'
+                        },
+                        {
+                            "text": "⚙ Настройки",
+                            "color": "secondary",
+                            "payload": '"settings"'
+                        }
+                    ]
+                ])
         }
 
-    def __game_step(self, message: Message, player: dict) -> dict:
+    def __game_step(
+        self,
+        message: Message,
+        player: Dict[str, Any]
+    ) -> Dict[str, Union[str, Keyboard, None]]:
         """
             Шаг вперед в новелле для
             игрока player.
@@ -247,29 +279,52 @@ class BotOutput:
                         )
                     }
 
-    def __novel_editor(self, message, player) -> dict:
+    def __novel_editor(
+        self,
+        message: Message,
+        player: Dict[str, Any]
+    ) -> Dict[str, Union[str, Keyboard, None]]:
         if player['storyline_in_editor'] is None:
             player['storyline_in_editor'] = []
             return {
                 "text": "Отправляйте сообщение для добавления слайдов."
             }
 
-    def __generate_choice_keyboard(self,
-                                   array: list,
-                                   color="secondary") -> Keyboard or False:
+    def __show_settings(
+        self,
+        message: Message,
+        player: Dict[str, Any]
+    ) -> Dict[str, Union[str, Keyboard, None]]:
+        return {
+            "text": "Настройки.",
+            "keyboard": keyboard_gen(
+                [[{
+                    "text": "Меню",
+                    "color": "positive",
+                    "payload": '"menu"'
+                }]]
+            )
+        }
+
+    def __generate_choice_keyboard(
+        self,
+        array: List[str],
+        color: str = "secondary"
+    ) -> Union[Keyboard, bool]:
         """
             Функция генерирует клавиатуру
-            из массива выбора.
+            из массива выборов array.
+
             Если элементов 5 или меньше - отводит
             каждому по 1 строке.
             Если больше, отводит макс. 2 элемента
             на строку.
             Длинна массива не больше 10.
 
-            :param array: array choices
-            :param color: color buttons
-            :return: object Keyboard
-                      or False if len(array) > 10
+            :param array: массив с выбором
+            :param color: цвет кнопок
+            :return:  Keyboard
+                      или False если len(array) > 10
         """
         if len(array) <= 5:
             # [1, 2, 3, 4, 5] => [[1], [2], [3], [4], [5]]
@@ -304,7 +359,7 @@ class BotOutput:
         else:
             return False
 
-    def __remove_player_game_flags(self, player: dict):
+    def __remove_player_game_flags(self, player: Dict[str, Any]) -> None:
         """
             Переводит флаги игрока player:
             game_is_choice,
@@ -319,14 +374,14 @@ class BotOutput:
         player['game_is_input_username'] = False
 
 
-proxy = Proxy(address="http://163.172.114.14:3838")
+proxy = Proxy(address="http://165.22.64.68:43377")
 vk_bot = Bot(config.token)
 
 bot_out = BotOutput()
 
 
 @vk_bot.on.message()
-async def on_message(message: Message):
+async def on_message(message: Message) -> None:
     """
         Когда приходит новое сообщение,
         вызывает метод on_message класса BotOutput
@@ -335,7 +390,13 @@ async def on_message(message: Message):
 
     ans = bot_out.on_message(message)
 
+    # Эффект печатанья сообщения.
     if ans.get('typing_delay'):
+        await message.api.request(
+            'messages.markAsRead',
+            {'peer_id': message.from_id}
+        )
+
         await message.api.request(
             'messages.setActivity',
             {
